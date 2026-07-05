@@ -17,7 +17,9 @@
 # and 0_startup/startup.scd's `if(hostname == "zynthian")` branch.
 # ******************************************************************************
 
+import os
 import logging
+import liblo
 
 from zyngine.zynthian_engine import zynthian_engine
 from zyngine.zynthian_controller import zynthian_controller
@@ -150,11 +152,19 @@ class zynthian_engine_supercollider(zynthian_engine):
         return self.get_dirlist(bank[0])
 
     def set_preset(self, processor, preset, preload=False):
-        # No process to (re)spawn and no patch file to open — SC's patch code
-        # is already loaded by startup.scd. Loading the yml here just refreshes
-        # this preset's zctrl definitions (get_controllers_dict, below).
+        # No process to (re)spawn — SC's patch code is already loaded by
+        # startup.scd (every patch file registers itself into ~zynPatches at
+        # boot). Loading the yml here refreshes this preset's zctrl
+        # definitions (get_controllers_dict, below); the OSC message below
+        # is what actually tells the already-running SC session which
+        # patch's ~zynPatchNoteOn/params should be live — the preset
+        # directory's own name IS the ~zynPatches key (e.g. presets/sc/
+        # Basic/subtractive1 -> "subtractive1" -> ~zynPatches[\subtractive1]).
         self.load_preset_config(preset)
         self.preset = preset[0]
+        if self.osc_target:
+            patch_name = os.path.basename(preset[0])
+            liblo.send(self.osc_target, "/scengine/loadpatch", patch_name)
         # zynthian_engine_puredata.set_preset does this itself too (doesn't rely
         # on the calling UI code to do it) — confirmed via live debug logging
         # that without this, get_controllers_dict only ever runs ONCE, before
