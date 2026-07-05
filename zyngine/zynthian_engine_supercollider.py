@@ -74,6 +74,18 @@ class zynthian_engine_supercollider(zynthian_engine):
         self.preset_config = None
         self.zctrl_config = None
 
+        # Base class leaves this None until zynthian_processor.load_bank_list()
+        # lazily initializes it via get_preset_favs() — but that only runs when
+        # a processor actually walks the multi-bank list screen. Our engine has
+        # exactly one bank, so the UI's single-bank shortcut skips straight to
+        # preset selection, and zynthian_processor.set_preset() (line ~369)
+        # unconditionally does `if preset_id in self.engine.preset_favs:` —
+        # crashing with a TypeError on None before our own set_preset() ever
+        # runs. Confirmed by reproducing the exact crash against the real
+        # zynthian_processor class. Starting with an empty dict sidesteps the
+        # ordering assumption entirely.
+        self.preset_favs = {}
+
         self.reset()
 
     def get_jackname(self):
