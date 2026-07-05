@@ -202,9 +202,21 @@ class zynthian_engine_supercollider(zynthian_engine):
         self._ctrl_screens = []
         if self.zctrl_config:
             for ctrl_group, ctrl_dict in self.zctrl_config.items():
+                # Chunk into screens of at most 4 controllers each — the
+                # touchscreen shows 4 knobs per page with no scroll/pagination
+                # within a single screen, so a 5th+ controller in one
+                # unchunked screen is simply invisible. Screen naming matches
+                # zynthian_engine_puredata's convention: the bare group name
+                # if it fits on one screen, "<group>#1", "<group>#2", ... if
+                # it needs more than one.
+                screen_num = 1
                 ctrl_set = []
                 for name, options in ctrl_dict.items():
                     try:
+                        if len(ctrl_set) >= 4:
+                            self._ctrl_screens.append([f"{ctrl_group}#{screen_num}", ctrl_set])
+                            ctrl_set = []
+                            screen_num += 1
                         if isinstance(options, int):
                             options = {'midi_cc': options}
                         if 'midi_chan' not in options:
@@ -217,7 +229,8 @@ class zynthian_engine_supercollider(zynthian_engine):
                     except Exception as e:
                         logging.error(f"Building controller '{name}': {e}")
                 if ctrl_set:
-                    self._ctrl_screens.append([ctrl_group, ctrl_set])
+                    screen_title = f"{ctrl_group}#{screen_num}" if screen_num > 1 else ctrl_group
+                    self._ctrl_screens.append([screen_title, ctrl_set])
 
         if zctrls:
             processor.controllers_dict = zctrls
