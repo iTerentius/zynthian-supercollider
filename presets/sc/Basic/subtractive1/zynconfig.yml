@@ -1,0 +1,34 @@
+# Controller declarations for the scBasic (subtractive synth) SC patch.
+# See 0_startup/_includes/_zyn-patches/subtractive1-patch.scd (supercollider
+# repo) for the actual SynthDef + MIDI note-in / OSC param registration.
+Synth:
+  amp:
+    name: "Amp"
+    value: 0.3
+    value_min: 0.0
+    value_max: 1.0
+    osc_path: "/scengine/amp"
+  cutoff:
+    name: "Cutoff"
+    value: 2000
+    value_min: 100
+    value_max: 8000
+    osc_path: "/scengine/cutoff"
+  res:
+    name: "Resonance"
+    value: 0.3
+    value_min: 0.05
+    value_max: 1.0
+    osc_path: "/scengine/res"
+  attack:
+    name: "Attack"
+    value: 0.01
+    value_min: 0.001
+    value_max: 2.0
+    osc_path: "/scengine/attack"
+  release:
+    name: "Release"
+    value: 0.3
+    value_min: 0.01
+    value_max: 3.0
+    osc_path: "/scengine/release"
