@@ -88,6 +88,17 @@ class zynthian_engine_supercollider(zynthian_engine):
 
         self.reset()
 
+        # zynthian_chain_manager never calls engine.start() anywhere — every
+        # other engine that needs it (e.g. Pd) calls it itself from inside its
+        # own set_preset(), as part of restarting its subprocess. We have no
+        # subprocess, but we still need osc_init() to actually run (it sets up
+        # self.osc_target, which zynthian_controller.send_value() sends knob
+        # changes to) and the MIDI jackname to get refined — so do both here,
+        # unconditionally, since __init__ runs exactly once per persistent
+        # instance and nothing else is guaranteed to call start() for us.
+        self.osc_init()
+        self._refresh_midi_jackname()
+
     def get_jackname(self):
         return self.jackname_midi
 
