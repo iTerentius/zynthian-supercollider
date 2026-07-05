@@ -142,10 +142,14 @@ class zynthian_engine_supercollider(zynthian_engine):
         # No process to (re)spawn and no patch file to open — SC's patch code
         # is already loaded by startup.scd. Loading the yml here just refreshes
         # this preset's zctrl definitions (get_controllers_dict, below).
-        logging.warning(f"[SC-DEBUG] set_preset called: preset={preset}")
-        ok = self.load_preset_config(preset)
-        logging.warning(f"[SC-DEBUG] load_preset_config returned {ok}, zctrl_config={self.zctrl_config}")
+        self.load_preset_config(preset)
         self.preset = preset[0]
+        # zynthian_engine_puredata.set_preset does this itself too (doesn't rely
+        # on the calling UI code to do it) — confirmed via live debug logging
+        # that without this, get_controllers_dict only ever runs ONCE, before
+        # preset selection (zctrl_config still None then), and never again:
+        # the control screen was built empty and never rebuilt.
+        processor.refresh_controllers()
         return True
 
     def load_preset_config(self, preset):
