@@ -142,7 +142,9 @@ class zynthian_engine_supercollider(zynthian_engine):
         # No process to (re)spawn and no patch file to open — SC's patch code
         # is already loaded by startup.scd. Loading the yml here just refreshes
         # this preset's zctrl definitions (get_controllers_dict, below).
-        self.load_preset_config(preset)
+        logging.warning(f"[SC-DEBUG] set_preset called: preset={preset}")
+        ok = self.load_preset_config(preset)
+        logging.warning(f"[SC-DEBUG] load_preset_config returned {ok}, zctrl_config={self.zctrl_config}")
         self.preset = preset[0]
         return True
 
@@ -181,6 +183,7 @@ class zynthian_engine_supercollider(zynthian_engine):
         (zyngine/zynthian_controller.py) already does
         liblo.send(self.osc_target, self.osc_path, self.get_ctrl_osc_val())
         generically whenever engine.send_controller_value() isn't implemented."""
+        logging.warning(f"[SC-DEBUG] get_controllers_dict called, zctrl_config={self.zctrl_config}")
         zctrls = {}
         self._ctrl_screens = []
         if self.zctrl_config:
@@ -206,6 +209,7 @@ class zynthian_engine_supercollider(zynthian_engine):
             processor.controllers_dict = zctrls
         else:
             zctrls = super().get_controllers_dict(processor)
+        logging.warning(f"[SC-DEBUG] get_controllers_dict returning {list(zctrls.keys())}, _ctrl_screens={self._ctrl_screens}")
         return zctrls
 
 # ******************************************************************************
