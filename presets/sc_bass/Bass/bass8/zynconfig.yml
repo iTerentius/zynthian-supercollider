@@ -1,0 +1,18 @@
+# Controller declarations for the bass8 SC patch.
+# See 0_startup/_includes/_zyn-patches/bass8-patch.scd (supercollider repo)
+# for the actual SynthDef + MIDI note-in / OSC param registration.
+# amp/pan are bass8's only true "knob" args beyond freq/gate, which come
+# from MIDI note-on itself.
+Synth:
+  amp:
+    name: "Amp"
+    value: 0.1
+    value_min: 0.0
+    value_max: 1.0
+    osc_path: "/scengine/amp"
+  pan:
+    name: "Pan"
+    value: 0.0
+    value_min: -1.0
+    value_max: 1.0
+    osc_path: "/scengine/pan"

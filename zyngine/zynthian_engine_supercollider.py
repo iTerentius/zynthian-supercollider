@@ -15,6 +15,11 @@
 #
 # See: /root/Music/supercollider/0_startup/_includes/_zyn-patches/ (SC side)
 # and 0_startup/startup.scd's `if(hostname == "zynthian")` branch.
+#
+# zynthian_engine_sc_bass (zynthian_engine_sc_bass.py) subclasses this to
+# point at a SECOND, independent persistent sclang process instead of trying
+# to run two chains through one shared session — see that file and
+# startup.scd's SC_ZYN_INSTANCE == "bass" branch.
 # ******************************************************************************
 
 import os
@@ -51,6 +56,19 @@ class zynthian_engine_supercollider(zynthian_engine):
 
     SC_OSC_PORT = 57120  # sclang's default OSC-in port
 
+    # Overridable by a subclass pointed at a DIFFERENT persistent sclang
+    # process (its own scsynth port, own JACK client, own preset tree) — e.g.
+    # zynthian_engine_sc_bass. Read via class attributes (not literals inside
+    # __init__) specifically so overriding them takes effect BEFORE osc_init()/
+    # _refresh_midi_jackname() run further down in __init__: osc_init() only
+    # actually does anything the FIRST time it's called (it no-ops once
+    # self.osc_server is set), so a subclass can't just override
+    # self.osc_target_port/self.jackname AFTER calling super().__init__() —
+    # by then osc_init() has already locked in the wrong port.
+    ENGINE_NAME = "SuperCollider"
+    ENGINE_NICKNAME = "SC"
+    JACKNAME = "SuperCollider"
+
     # ---------------------------------------------------------------------------
     # Initialization
     # ---------------------------------------------------------------------------
@@ -59,15 +77,15 @@ class zynthian_engine_supercollider(zynthian_engine):
         super().__init__(state_manager)
 
         self.type = "MIDI Synth"
-        self.name = "SuperCollider"
-        self.nickname = "SC"
+        self.name = self.ENGINE_NAME
+        self.nickname = self.ENGINE_NICKNAME
 
         # Fixed, NOT get_next_jackname()-generated: scsynth is a single
         # persistent process whose real JACK client name is always literally
-        # "SuperCollider" (set via s.options.device in startup.scd), not an
+        # self.JACKNAME (set via s.options.device in startup.scd), not an
         # engine-spawned-per-instance name that needs a "-01" disambiguator.
-        self.jackname = "SuperCollider"
-        self.jackname_midi = "SuperCollider"  # refined once ALSA client is found
+        self.jackname = self.JACKNAME
+        self.jackname_midi = self.JACKNAME  # refined once ALSA client is found
 
         self.osc_target_port = self.SC_OSC_PORT
         self.command = None  # persistent service — see module docstring
@@ -117,20 +135,25 @@ class zynthian_engine_supercollider(zynthian_engine):
         self.osc_end()
 
     def _refresh_midi_jackname(self):
-        """Find SC's ALSA MIDI client uid so zynautoconnect wires
+        """Find this instance's ALSA MIDI client uid so zynautoconnect wires
         ZynMidiRouter into its 'in0' port specifically — in1-in4 stay free
         for other MIDI uses in the same sclang session. Scanned once here
-        (not per preset-switch, unlike Pd): SC's process persists for the
-        box's uptime, so its ALSA client number is stable once found."""
+        (not per preset-switch, unlike Pd): the SC process persists for the
+        box's uptime, so its ALSA client number is stable once found.
+
+        Keyed off self.jackname (not a literal "SuperCollider") so a
+        subclass pointed at a different sclang process/JACK client (e.g.
+        zynthian_engine_sc_bass's "SCBass") finds its OWN ALSA client
+        instead of the original instance's."""
         try:
             with open("/proc/asound/seq/clients", "r") as f:
                 for line in f.readlines():
-                    if line.startswith("Client") and '"SuperCollider" [User Legacy]' in line:
+                    if line.startswith("Client") and f'"{self.jackname}" [User Legacy]' in line:
                         uid = int(line[7:10])
-                        self.jackname_midi = f"SuperCollider \\[{uid}\\] \\(playback\\): in0$"
+                        self.jackname_midi = f"{self.jackname} \\[{uid}\\] \\(playback\\): in0$"
                         logging.debug(f"SC MIDI jackname => \"{self.jackname_midi}\"")
                         return
-            logging.warning("Can't find SC's ALSA MIDI client — is sclang running?")
+            logging.warning(f"Can't find SC's ALSA MIDI client \"{self.jackname}\" — is sclang running?")
         except Exception as e:
             logging.error(f"Can't scan ALSA MIDI clients => {e}")
 
