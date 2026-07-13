@@ -69,6 +69,17 @@ class zynthian_engine_supercollider(zynthian_engine):
     ENGINE_NICKNAME = "SC"
     JACKNAME = "SuperCollider"
 
+    # SC's ALSA MIDI client is ALWAYS literally named "SuperCollider" — found
+    # 2026-07-13, this is baked into SC's ALSA MIDI backend and is NOT
+    # derived from s.options.device/JACKNAME at all. So with two concurrent
+    # sclang processes there are two identically-named ALSA clients,
+    # distinguishable only by numeric client ID — scanning
+    # /proc/asound/seq/clients BY NAME (the original approach) can no longer
+    # tell them apart. Each startup.scd zynthian branch instead writes its
+    # own MIDIClient.getClientID to this fixed, per-instance file, which
+    # _refresh_midi_jackname() reads directly. Overridable per subclass.
+    MIDI_CLIENTID_FILE = "/tmp/sc_midi_clientid"
+
     # ---------------------------------------------------------------------------
     # Initialization
     # ---------------------------------------------------------------------------
@@ -137,25 +148,25 @@ class zynthian_engine_supercollider(zynthian_engine):
     def _refresh_midi_jackname(self):
         """Find this instance's ALSA MIDI client uid so zynautoconnect wires
         ZynMidiRouter into its 'in0' port specifically — in1-in4 stay free
-        for other MIDI uses in the same sclang session. Scanned once here
-        (not per preset-switch, unlike Pd): the SC process persists for the
-        box's uptime, so its ALSA client number is stable once found.
+        for other MIDI uses in the same sclang session. Read once here (not
+        per preset-switch, unlike Pd): the SC process persists for the box's
+        uptime, so its ALSA client number is stable once found.
 
-        Keyed off self.jackname (not a literal "SuperCollider") so a
-        subclass pointed at a different sclang process/JACK client (e.g.
-        zynthian_engine_sc_bass's "SCBass") finds its OWN ALSA client
-        instead of the original instance's."""
+        Reads MIDI_CLIENTID_FILE rather than scanning /proc/asound/seq/clients
+        by name (the original approach, before a second concurrent sclang
+        process existed to compare against): SC's ALSA MIDI client is ALWAYS
+        literally named "SuperCollider" regardless of self.jackname/
+        s.options.device, so with two persistent sclang processes running
+        there are two identically-named ALSA clients — name-matching can no
+        longer tell them apart. startup.scd writes each process's own
+        MIDIClient.getClientID to its own file at boot."""
         try:
-            with open("/proc/asound/seq/clients", "r") as f:
-                for line in f.readlines():
-                    if line.startswith("Client") and f'"{self.jackname}" [User Legacy]' in line:
-                        uid = int(line[7:10])
-                        self.jackname_midi = f"{self.jackname} \\[{uid}\\] \\(playback\\): in0$"
-                        logging.debug(f"SC MIDI jackname => \"{self.jackname_midi}\"")
-                        return
-            logging.warning(f"Can't find SC's ALSA MIDI client \"{self.jackname}\" — is sclang running?")
+            with open(self.MIDI_CLIENTID_FILE, "r") as f:
+                uid = int(f.read().strip())
+            self.jackname_midi = f"{self.jackname} \\[{uid}\\] \\(playback\\): in0$"
+            logging.debug(f"SC MIDI jackname => \"{self.jackname_midi}\"")
         except Exception as e:
-            logging.error(f"Can't scan ALSA MIDI clients => {e}")
+            logging.error(f"Can't read SC MIDI client ID from {self.MIDI_CLIENTID_FILE} => {e}")
 
     # ----------------------------------------------------------------------------
     # Bank Management

@@ -42,3 +42,9 @@ class zynthian_engine_sc_bass(zynthian_engine_supercollider):
     ENGINE_NAME = "SuperCollider Bass"
     ENGINE_NICKNAME = "SB"
     JACKNAME = "SCBass"
+
+    # SC's ALSA MIDI client name is fixed to "SuperCollider" regardless of
+    # JACKNAME (see base class's MIDI_CLIENTID_FILE comment) — this process's
+    # own client ID is written here by startup.scd's SC_ZYN_INSTANCE=="bass"
+    # branch, distinct from the original instance's file.
+    MIDI_CLIENTID_FILE = "/tmp/scbass_midi_clientid"
