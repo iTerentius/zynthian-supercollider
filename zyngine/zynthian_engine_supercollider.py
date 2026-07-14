@@ -80,6 +80,21 @@ class zynthian_engine_supercollider(zynthian_engine):
     # _refresh_midi_jackname() reads directly. Overridable per subclass.
     MIDI_CLIENTID_FILE = "/tmp/sc_midi_clientid"
 
+    # The real ALSA/JACK MIDI client name — ALWAYS "SuperCollider", on every
+    # instance, regardless of JACKNAME. Found live 2026-07-13 (round two):
+    # a subclass overriding JACKNAME alone made _refresh_midi_jackname() build
+    # its port-matching regex against "<JACKNAME> \[uid\] ...", e.g.
+    # "SCBass \[130\] ..." — which never matched any real JACK port (they're
+    # all exposed via a2jmidid as "a2j:SuperCollider [<uid>] ..."), so
+    # zynautoconnect never wired MIDI into the bass instance's own scsynth at
+    # all. Symptom: hitting keys on the "SC Bass" chain instead (or also)
+    # triggered whatever patch was active in the ORIGINAL "SC" session,
+    # because that session's global, unfiltered MIDIdef.noteOn (chan: nil)
+    # was still receiving the note via its own correctly-wired "in0". Do NOT
+    # override this in a subclass — only MIDI_CLIENTID_FILE (which client ID
+    # is "mine") and JACKNAME (the AUDIO client name) actually differ.
+    ALSA_MIDI_CLIENT_NAME = "SuperCollider"
+
     # ---------------------------------------------------------------------------
     # Initialization
     # ---------------------------------------------------------------------------
@@ -159,11 +174,16 @@ class zynthian_engine_supercollider(zynthian_engine):
         s.options.device, so with two persistent sclang processes running
         there are two identically-named ALSA clients — name-matching can no
         longer tell them apart. startup.scd writes each process's own
-        MIDIClient.getClientID to its own file at boot."""
+        MIDIClient.getClientID to its own file at boot.
+
+        The regex is built from ALSA_MIDI_CLIENT_NAME (always "SuperCollider"),
+        NOT self.jackname — the AUDIO client name (JACKNAME) is per-instance,
+        but the MIDI client name is fixed regardless of it (see
+        ALSA_MIDI_CLIENT_NAME's comment)."""
         try:
             with open(self.MIDI_CLIENTID_FILE, "r") as f:
                 uid = int(f.read().strip())
-            self.jackname_midi = f"{self.jackname} \\[{uid}\\] \\(playback\\): in0$"
+            self.jackname_midi = f"{self.ALSA_MIDI_CLIENT_NAME} \\[{uid}\\] \\(playback\\): in0$"
             logging.debug(f"SC MIDI jackname => \"{self.jackname_midi}\"")
         except Exception as e:
             logging.error(f"Can't read SC MIDI client ID from {self.MIDI_CLIENTID_FILE} => {e}")
